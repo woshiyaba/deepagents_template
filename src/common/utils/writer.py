@@ -139,3 +139,40 @@ async def astream_agent_collect(
     finally:
         sc.finish()
     return sc.result
+
+
+async def agent_collect(
+    agent: Any,
+    content: str,
+    thread_id: str,
+    node_name: str | None = None,
+) -> str:
+    """流式调用 agent 并收集完整结果（异步版）。
+
+    同时订阅 messages（流式推送思考过程）和 updates（提取最终结果）。
+    node_name 非空时同时推送 start/streaming/end 状态事件。
+    """
+    agent.invoke(
+        {"messages": [{"role": "user", "content": content}]},
+        config={"configurable": {"thread_id": thread_id}}
+    )
+    sc = StreamCollector(node_name)
+    sc.start()
+    try:
+        async for chunk in agent.astream(
+            {"messages": [{"role": "user", "content": content}]},
+            config={"configurable": {"thread_id": thread_id}},
+            stream_mode=["messages", "updates"],
+            subgraphs=True,
+            version="v2",
+        ):
+            if chunk["type"] == "messages":
+                token, _metadata = chunk["data"]
+                sc.push(token.content)
+            elif chunk["type"] == "updates":
+                final = _extract_final_content(chunk)
+                if final:
+                    sc.set_result(final)
+    finally:
+        sc.finish()
+    return sc.result

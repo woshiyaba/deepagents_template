@@ -63,7 +63,7 @@ class GraphState(TypedDict):
     result: str
 
 
-from src.common.example.example_agent import agent, build_user_input
+from src.common.example.example_agent import PROMPT_KEY, create_skills_find_agent
 
 
 async def process(state: GraphState) -> dict:
@@ -74,11 +74,12 @@ async def process(state: GraphState) -> dict:
     )
 
     try:
+        agent = await create_skills_find_agent()
         result = await astream_agent_collect(
             agent,
             state["user_input"],
             thread_id="thread_123",
-            node_name='skills_find'
+            node_name=PROMPT_KEY,
         )
         _log_step_end(
             "process_sftb",
